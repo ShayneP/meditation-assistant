@@ -10,12 +10,16 @@ class AudioHandler:
         self.audio_track = rtc.LocalAudioTrack.create_audio_track("background_audio", self.audio_source)
         self.audio_task = None
         self.audio_running = asyncio.Event()
+        self.fade_out = False
         
     async def start_audio(self, wav_path: Path | str, volume: float = 0.3):
         self.audio_running.set()
+        self.fade_out = False
         self.audio_task = asyncio.create_task(self._play_audio(wav_path, volume))
         
     async def stop_audio(self):
+        self.fade_out = True
+        await asyncio.sleep(5.2)
         self.audio_running.clear()
         if self.audio_task:
             await self.audio_task
@@ -24,6 +28,7 @@ class AudioHandler:
     async def _play_audio(self, wav_path: Path | str, volume: float):
         samples_per_channel = 9600
         wav_path = Path(wav_path)
+        fade_start_time = None
         
         while self.audio_running.is_set():
             with wave.open(str(wav_path), 'rb') as wav_file:
@@ -44,6 +49,17 @@ class AudioHandler:
                     
                     if len(chunk) < samples_per_channel:
                         chunk = np.pad(chunk, (0, samples_per_channel - len(chunk)))
+                    
+                    if self.fade_out:
+                        if fade_start_time is None:
+                            fade_start_time = asyncio.get_event_loop().time()
+                        
+                        elapsed_fade_time = asyncio.get_event_loop().time() - fade_start_time
+                        if elapsed_fade_time >= 5.0:
+                            break
+                        
+                        fade_factor = max(0.0, 1.0 - (elapsed_fade_time / 5.0))
+                        volume = volume * fade_factor
                     
                     chunk = np.tanh(chunk / 32768.0) * 32768.0
                     chunk = np.round(chunk * volume).astype(np.int16)

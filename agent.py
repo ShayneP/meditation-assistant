@@ -71,7 +71,7 @@ async def entrypoint(ctx: JobContext):
             
             tasks.append(asyncio.create_task(schedule_line(line_time, text)))
 
-        final_time = lines[-1].get("time", 0) + 5
+        final_time = lines[-1].get("time", 0) + 10
         tasks.append(
             asyncio.create_task(
                 schedule_line(
